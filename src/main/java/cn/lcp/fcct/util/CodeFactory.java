@@ -220,7 +220,7 @@ public class CodeFactory {
                     getEntity.append("    @Select(\"select * from "+tableName+" where "+tableIDName+"=#{"+poIDName+"}  and is_status=0\")\n").
                             append("    "+conversionTableName+" getById(@Param(\""+poIDName+"\") "+poIDType+" "+poIDName+") throws Exception;\n");
                     updateEntity.append("    @SelectProvider(type="+conversionTableName+"ServiceImpl.class,method=\"updateSql\")\n" +
-                            "    void update("+conversionTableName+" "+conversionTableNameLower+") throws Exception;\n");
+                            "    int update("+conversionTableName+" "+conversionTableNameLower+") throws Exception;\n");
                     serviceEntity.append("    int insert("+conversionTableName+" "+conversionTableNameLower+");\n").
                             append("    int update("+conversionTableName+" "+conversionTableNameLower+");\n").
                             append("    List<"+conversionTableName+"> selectAll();\n").
