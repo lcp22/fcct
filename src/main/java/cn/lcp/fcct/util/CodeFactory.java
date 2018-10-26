@@ -16,6 +16,7 @@ public class CodeFactory {
     private static List<String> files = new ArrayList<>();
     private static Boolean excludeFirstParamater = false;
     private static List<String> excludefiles = new ArrayList<>();
+    private static List<String> exclude_fileds = new ArrayList<>();
 
     private CodeFactory(){}
     public static CodeFactory getInstance(){
@@ -31,6 +32,9 @@ public class CodeFactory {
                 excludeFirstParamater = Boolean.parseBoolean(properties.getProperty("EXCLUDE_FIRST_PARAMATER").trim());
                 for (String exclude_file:properties.getProperty("EXCLUDE_FILES").trim().split(",")) {
                     excludefiles.add(exclude_file);
+                }
+                for (String exclude_filed:properties.getProperty("EXCLUDE_FILEDS").trim().split(",")) {
+                    exclude_fileds.add(exclude_filed);
                 }
                 for (String code_templates_folder:properties.getProperty("TEMPLATES").trim().split(",")) {
                     switch (code_templates_folder){
@@ -110,9 +114,6 @@ public class CodeFactory {
         }
         VelocityContext context = new VelocityContext();
         Map<String, String> entity = getEntity(tableName,informationSchemas);
-        if(false){
-            return;
-        }
         String conversionTableName = entity.get("poEntity");
         context.put("insertEntity",entity.get("insertEntity"));
         context.put("deleteEntity",entity.get("deleteEntity"));
@@ -194,14 +195,16 @@ public class CodeFactory {
                 poIDType = poDataType;
             }
             //Po
-            poParamaterEntity.append("    private ").append(poDataType+" ").
-                    append(columnName+";     //").append(informationSchemas.get(i).getColumnComment()+"\n");
-            poParamaterGetSetEntity.append("    public ").append(poDataType+" ").
-                    append("get"+columnName.substring(0,1).toUpperCase()+columnName.substring(1)+"() {\n        return ").
-                    append(columnName+";\n    }").append("\n    public "+conversionTableName+" ").
-                    append("set"+columnName.substring(0,1).toUpperCase()+columnName.substring(1)+"(").
-                    append(poDataType+" ").
-                    append(columnName+") {\n").append("        this."+columnName+" = "+columnName+";\n        return this;\n    }\n");
+            if(!exclude_fileds.contains(informationSchemas.get(i).getColumnName())) {
+                poParamaterEntity.append("    private ").append(poDataType + " ").
+                        append(columnName + ";     //").append(informationSchemas.get(i).getColumnComment() + "\n");
+                poParamaterGetSetEntity.append("    public ").append(poDataType + " ").
+                        append("get" + columnName.substring(0, 1).toUpperCase() + columnName.substring(1) + "() {\n        return ").
+                        append(columnName + ";\n    }").append("\n    public " + conversionTableName + " ").
+                        append("set" + columnName.substring(0, 1).toUpperCase() + columnName.substring(1) + "(").
+                        append(poDataType + " ").
+                        append(columnName + ") {\n").append("        this." + columnName + " = " + columnName + ";\n        return this;\n    }\n");
+            }
             if(excludeParamater(i,cn)){
                 String conversionTableNameLower = conversionTableName.toString().substring(0,1).toLowerCase()+conversionTableName.toString().substring(1);
                 if(informationSchemas.size()==i+1){
@@ -218,19 +221,19 @@ public class CodeFactory {
                             append("    "+conversionTableName+" getById(@Param(\""+poIDName+"\") "+poIDType+" "+poIDName+") throws Exception;\n");
                     updateEntity.append("    @SelectProvider(type="+conversionTableName+"ServiceImpl.class,method=\"updateSql\")\n" +
                             "    void update("+conversionTableName+" "+conversionTableNameLower+") throws Exception;\n");
-                    serviceEntity.append("    int insert("+conversionTableName+" "+conversionTableNameLower+") throws  Exception;\n").
-                            append("    void update("+conversionTableName+" "+conversionTableNameLower+") throws  Exception;\n").
-                            append("    List<"+conversionTableName+"> selectAll() throws Exception;\n").
-                            append("    "+conversionTableName+" getById("+poIDType+" "+poIDName+") throws Exception;\n").
-                            append("    int deleteById("+poIDType+" "+poIDName+") throws Exception;\n").
-                            append("    String updateSql("+conversionTableName+" "+conversionTableNameLower+") throws Exception;");
+                    serviceEntity.append("    int insert("+conversionTableName+" "+conversionTableNameLower+");\n").
+                            append("    int update("+conversionTableName+" "+conversionTableNameLower+");\n").
+                            append("    List<"+conversionTableName+"> selectAll();\n").
+                            append("    "+conversionTableName+" getById("+poIDType+" "+poIDName+");\n").
+                            append("    int deleteById("+poIDType+" "+poIDName+");\n").
+                            append("    String updateSql("+conversionTableName+" "+conversionTableNameLower+");");
                     serviceImplEntity.append("        @Autowired\n        private "+conversionTableName+"Dao "+conversionTableNameLower+"Dao;\n\n").
-                            append("        @Override\n        public int insert("+conversionTableName+" "+conversionTableNameLower+") throws Exception {\n            return "+conversionTableNameLower+"Dao.insert("+conversionTableNameLower+");\n\t\t}\n\n").
-                            append("        @Override\n        public void update("+conversionTableName+" "+conversionTableNameLower+") throws Exception {\n           "+conversionTableNameLower+"Dao.update("+conversionTableNameLower+");\n\t\t}\n\n").
-                            append("        @Override\n        public List<"+conversionTableName+"> selectAll() throws Exception {\n            return "+conversionTableNameLower+"Dao.selectAll();\n\t\t}\n\n").
-                            append("        @Override\n        public "+conversionTableName+" getById("+poIDType+" "+poIDName+") throws Exception {\n\t\t    return "+conversionTableNameLower+"Dao.getById("+poIDName+");\n\t\t}\n\n").
-                            append("        @Override\n        public int deleteById("+poIDType+" "+poIDName+") throws Exception {\n            return sysUserDao.deleteById("+poIDName+");\n\t\t}\n\n").
-                            append("        @Override\n        public String updateSql("+conversionTableName+" "+conversionTableNameLower+  ") throws Exception {\n        StringBuilder updatesql = new StringBuilder();\n        updatesql.append(\"update "+tableName+" set \");\n"+setSQL+"        updatesql.delete(updatesql.length()-5,updatesql.length());\n        updatesql.append(\" where "+tableIDName+"=#{"+poIDName+"}\");\n        return updatesql.toString();\n\t\t}");
+                            append("        @Override\n        public int insert("+conversionTableName+" "+conversionTableNameLower+") {\n            Integer sql_status = null;\n            try {\n                sql_status = "+conversionTableNameLower+"Dao.insert("+conversionTableNameLower+");\n            }catch (Exception e){\n                e.printStackTrace();\n            }\n            return sql_status;\n            \n\t\t}\n\n").
+                            append("        @Override\n        public int update("+conversionTableName+" "+conversionTableNameLower+") {\n            Integer sql_status = null;\n            try {\n                sql_status = "+conversionTableNameLower+"Dao.update("+conversionTableNameLower+");\n            }catch (Exception e){\n                e.printStackTrace();\n            }\n            return sql_status;\n            \n\t\t}\n\n").
+                            append("        @Override\n        public List<"+conversionTableName+"> selectAll() {\n            List<"+conversionTableName+"> datas = null;\n            try {\n                datas = "+conversionTableNameLower+"Dao.selectAll();\n            }catch (Exception e){\n                e.printStackTrace();\n            }\n            return datas;\n            \n\t\t}\n\n").
+                            append("        @Override\n        public "+conversionTableName+" getById("+poIDType+" "+poIDName+") {\n            "+conversionTableName+" data = null;\n            try {\n                data = "+conversionTableNameLower+"Dao.getById("+poIDName+");\n            }catch (Exception e){\n                e.printStackTrace();\n            }\n            return data;\n            \n\t\t}\n\n").
+                            append("        @Override\n        public int deleteById("+poIDType+" "+poIDName+") {\n            Integer sql_status = null;\n            try {\n                sql_status = "+conversionTableNameLower+"Dao.deleteById("+poIDName+");\n            }catch (Exception e){\n                e.printStackTrace();\n            }\n            return sql_status;\n            \n\t\t}\n\n").
+                            append("        @Override\n        public String updateSql("+conversionTableName+" "+conversionTableNameLower+  ") {\n        StringBuilder updatesql = new StringBuilder();\n        updatesql.append(\"update "+tableName+" set \");\n"+setSQL+"        updatesql.delete(updatesql.length()-5,updatesql.length());\n        updatesql.append(\" where "+tableIDName+"=#{"+poIDName+"}\");\n        return updatesql.toString();\n\t\t}");
                 }else{
                     insertEntity2.append("#{"+cn+"},");
                     insertEntity.append(cn+",");
