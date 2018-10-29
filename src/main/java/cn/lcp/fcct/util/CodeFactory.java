@@ -14,7 +14,7 @@ public class CodeFactory {
     private static String code_package ;
     private static List<String> codeTemplates = new ArrayList<>();
     private static List<String> files = new ArrayList<>();
-    private static Boolean excludeFirstParamater = false;
+    private static Boolean excludeFirstParamater;
     private static List<String> excludefiles = new ArrayList<>();
     private static List<String> exclude_fileds = new ArrayList<>();
 
@@ -46,13 +46,13 @@ public class CodeFactory {
                             codeTemplates.add("Dao.java");
                             files.add(code_package+"dao/");
                             break;
-                        case "service":
+                        case "server":
                             codeTemplates.add("Service.java");
-                            files.add(code_package+"service/");
+                            files.add(code_package+"server/");
                             break;
-                        case "serviceImpl":
+                        case "serverImpl":
                             codeTemplates.add("ServiceImpl.java");
-                            files.add(code_package+"service/Impl/");
+                            files.add(code_package+"server/Impl/");
                             break;
                     }
                 }
@@ -77,6 +77,20 @@ public class CodeFactory {
             }
         }
         return true;
+    }
+
+    private Boolean validateParamateNum(List<InformationSchema> informationSchemas,List<String> exclude_fileds){
+        List<String> vpn = new ArrayList<>();
+        for (int i = 0; i < informationSchemas.size(); i++) {
+            if(excludeFirstParamater&&i==0){
+                continue;
+            }
+            String columnName = informationSchemas.get(i).getColumnName();
+            if(exclude_fileds.contains(columnName)){
+                vpn.add(columnName);
+            }
+        }
+        return vpn.size()!=1;
     }
 
     private String formatSqlParamater(String sqlParamater){
@@ -114,6 +128,7 @@ public class CodeFactory {
         }
         VelocityContext context = new VelocityContext();
         Map<String, String> entity = getEntity(tableName,informationSchemas);
+        System.out.println(entity.get("insertEntity"));
         String conversionTableName = entity.get("poEntity");
         context.put("insertEntity",entity.get("insertEntity"));
         context.put("deleteEntity",entity.get("deleteEntity"));
@@ -177,6 +192,7 @@ public class CodeFactory {
         String poIDType = "";
         StringBuilder setSQL = new StringBuilder();
         setSQL.append("");
+        Boolean vpn = validateParamateNum(informationSchemas, exclude_fileds);
         for (int i = 0; i < informationSchemas.size(); i++) {
             StringBuilder columnName = new StringBuilder();
             String cn = informationSchemas.get(i).getColumnName();
@@ -195,19 +211,20 @@ public class CodeFactory {
                 poIDType = poDataType;
             }
             //Po
-            if(!exclude_fileds.contains(informationSchemas.get(i).getColumnName())) {
-                poParamaterEntity.append("    private ").append(poDataType + " ").
-                        append(columnName + ";     //").append(informationSchemas.get(i).getColumnComment() + "\n");
-                poParamaterGetSetEntity.append("    public ").append(poDataType + " ").
-                        append("get" + columnName.substring(0, 1).toUpperCase() + columnName.substring(1) + "() {\n        return ").
-                        append(columnName + ";\n    }").append("\n    public " + conversionTableName + " ").
-                        append("set" + columnName.substring(0, 1).toUpperCase() + columnName.substring(1) + "(").
-                        append(poDataType + " ").
-                        append(columnName + ") {\n").append("        this." + columnName + " = " + columnName + ";\n        return this;\n    }\n");
+            if(!exclude_fileds.contains(informationSchemas.get(i).getColumnName())){
+                poParamaterEntity.append("    private ").append(poDataType+" ").
+                        append(columnName+";     //").append(informationSchemas.get(i).getColumnComment()+"\n");
+                poParamaterGetSetEntity.append("    public ").append(poDataType+" ").
+                        append("get"+columnName.substring(0,1).toUpperCase()+columnName.substring(1)+"() {\n        return ").
+                        append(columnName+";\n    }").append("\n    public "+conversionTableName+" ").
+                        append("set"+columnName.substring(0,1).toUpperCase()+columnName.substring(1)+"(").
+                        append(poDataType+" ").
+                        append(columnName+") {\n").append("        this."+columnName+" = "+columnName+";\n        return this;\n    }\n");
             }
             if(excludeParamater(i,cn)){
                 String conversionTableNameLower = conversionTableName.toString().substring(0,1).toLowerCase()+conversionTableName.toString().substring(1);
-                if(informationSchemas.size()==i+1){
+                setSQL.append("        if("+conversionTableNameLower+".get"+columnName.toString().substring(0,1).toUpperCase()+columnName.toString().substring(1)+"()!=null){\n            updatesql.append(\""+cn+"=#{"+columnName+"} and \");\n        }\n");
+                if(!vpn||informationSchemas.size()==i+1){
                     insertEntity2.append("#{"+columnName+"})\")\n");
                     insertEntity.append(cn+") ");
                     insertEntity.append(insertEntity2);
@@ -220,7 +237,7 @@ public class CodeFactory {
                     getEntity.append("    @Select(\"select * from "+tableName+" where "+tableIDName+"=#{"+poIDName+"}  and is_status=0\")\n").
                             append("    "+conversionTableName+" getById(@Param(\""+poIDName+"\") "+poIDType+" "+poIDName+") throws Exception;\n");
                     updateEntity.append("    @SelectProvider(type="+conversionTableName+"ServiceImpl.class,method=\"updateSql\")\n" +
-                            "    int update("+conversionTableName+" "+conversionTableNameLower+") throws Exception;\n");
+                            "    int update("+conversionTableName+" "+conversionTableNameLower+");\n");
                     serviceEntity.append("    int insert("+conversionTableName+" "+conversionTableNameLower+");\n").
                             append("    int update("+conversionTableName+" "+conversionTableNameLower+");\n").
                             append("    List<"+conversionTableName+"> selectAll();\n").
@@ -237,7 +254,6 @@ public class CodeFactory {
                 }else{
                     insertEntity2.append("#{"+cn+"},");
                     insertEntity.append(cn+",");
-                    setSQL.append("        if("+conversionTableNameLower+".get"+columnName.toString().substring(0,1).toUpperCase()+columnName.toString().substring(1)+"()!=null){\n            updatesql.append(\""+cn+"=#{"+columnName+"} and \");\n        }\n");
                 }
             }
         }
